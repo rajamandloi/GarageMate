@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "864339206930",
+    "project_id": "garagemate-362a6",
+    "storage_bucket": "garagemate-362a6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:864339206930:android:4968aa33e841d1800849cb",
+        "android_client_info": {
+          "package_name": "com.example.garage_mate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAYgqFcPr3J0JN2fQLYhRBGOZI8w7Pu-8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
