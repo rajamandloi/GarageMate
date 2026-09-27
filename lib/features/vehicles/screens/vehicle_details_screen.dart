@@ -103,7 +103,9 @@ class VehicleDetailsScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const ServicesScreen(),
+        builder: (_) => ServicesScreen(
+          vehicleId: vehicle.id,
+        ),
       ),
     );
   }
@@ -112,7 +114,9 @@ class VehicleDetailsScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const RemindersScreen(),
+        builder: (_) => RemindersScreen(
+          customerId: vehicle.customerId,
+        ),
       ),
     );
   }

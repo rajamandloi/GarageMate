@@ -6,6 +6,8 @@ const protect =
 const requireGarage =
   require("../middleware/garageMiddleware");
 
+  const requireStaffRole = require("../middleware/requireStaffRole");
+
 const {
   createInvoice,
   getInvoices,
@@ -59,6 +61,26 @@ router.post(
   "/:id/send-whatsapp",
   protect,
   requireGarage,
+  sendInvoiceOnWhatsApp
+);
+
+
+
+// Create invoice — owner, manager, accountant
+router.post(
+  "/",
+  protect,
+  requireGarage,
+  requireStaffRole(["manager", "accountant"]),
+  createInvoice
+);
+
+// Send on WhatsApp — owner, manager, accountant
+router.post(
+  "/:id/send-whatsapp",
+  protect,
+  requireGarage,
+  requireStaffRole(["manager", "accountant"]),
   sendInvoiceOnWhatsApp
 );
 

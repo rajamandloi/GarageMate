@@ -236,58 +236,36 @@ class ReminderProvider extends ChangeNotifier {
   // COMPLETE REMINDER
   // ------------------------------------------------------------
 
-  Future<bool> completeReminder(
-    String reminderId,
-  ) async {
-    _error = null;
-    notifyListeners();
+  Future<bool> completeReminder(String reminderId) async {
+  _error = null;
 
-    try {
-      final response =
-          await ApiService.patch(
-        '/reminders/$reminderId/complete',
-        {},
+  try {
+    final response = await ApiService.patch(
+      '/reminders/$reminderId/complete',
+      {},
+    );
+
+    if (response['success'] == true) {
+      final index = _reminders.indexWhere(
+        (r) => r.id == reminderId,
       );
 
-      if (response['success'] == true &&
-          response['reminder'] != null) {
-        final updatedReminder =
-            Reminder.fromJson(
-          Map<String, dynamic>.from(
-            response['reminder'],
-          ),
-        );
-
-        final index =
-            _reminders.indexWhere(
-          (item) => item.id == reminderId,
-        );
-
-        if (index != -1) {
-          _reminders[index] =
-              updatedReminder;
-        }
-
+      if (index != -1) {
+        _reminders[index].status = ReminderStatus.completed;
         notifyListeners();
-
-        return true;
       }
 
-      _error =
-          response['message']?.toString() ??
-          'Unable to complete reminder';
-
-      notifyListeners();
-
-      return false;
-    } catch (error) {
-      _error = error.toString();
-
-      notifyListeners();
-
-      return false;
+      return true;
     }
+
+    _error = response['message']?.toString() ??
+        'Unable to complete reminder';
+    return false;
+  } catch (error) {
+    _error = error.toString();
+    return false;
   }
+}
 
   // ------------------------------------------------------------
   // CANCEL REMINDER

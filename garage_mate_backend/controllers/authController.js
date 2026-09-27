@@ -902,29 +902,29 @@ const register = async (
 };
 
 // =====================================================
-// LOGIN
+// LOGIN (supports email OR phone)
 // =====================================================
 
-const login = async (
-  req,
-  res
-) => {
+const login = async (req, res) => {
   try {
     const {
       email,
+      phone,
       password,
     } = req.body;
 
-    if (!email || !password) {
+    // Login identifier = email or phone
+    const identifier = (email || phone || "")
+      .toString()
+      .trim();
+
+    if (!identifier || !password) {
       return res.status(400).json({
         success: false,
         message:
-          "Email and password are required",
+          "Email/Phone and password are required",
       });
     }
-
-    const normalizedEmail =
-      email.toLowerCase().trim();
 
     if (
       typeof password !== "string" ||
@@ -932,154 +932,144 @@ const login = async (
     ) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid email or password",
+        message: "Invalid credentials",
       });
     }
 
-    const user =
-      await User.findOne({
-        email:
-          normalizedEmail,
+    // Build query
+    let user;
+
+    const isEmail = identifier.includes("@");
+
+    if (isEmail) {
+      user = await User.findOne({
+        email: identifier.toLowerCase(),
+      }).select(
+        "+password +refreshTokenHash +refreshTokenExpires"
+      );
+    } else {
+      // Normalize phone
+      let digits = identifier.replace(/\D/g, "");
+
+      if (digits.length === 10) {
+        digits = "91" + digits;
+      }
+
+      user = await User.findOne({
+        phone: digits,
       }).select(
         "+password +refreshTokenHash +refreshTokenExpires"
       );
 
+      // Also try with +91 prefix
+      if (!user) {
+        user = await User.findOne({
+          phone: `+${digits}`,
+        }).select(
+          "+password +refreshTokenHash +refreshTokenExpires"
+        );
+      }
+    }
+
     if (!user) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid email or password",
+        message: "Invalid credentials",
       });
     }
 
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
-        message:
-          "Account is inactive",
+        message: "Account is inactive",
       });
     }
 
-    // Only email verification is required.
-   
-
-    const passwordMatch =
-      await bcrypt.compare(
-        password,
-        user.password
-      );
+    const passwordMatch = await bcrypt.compare(
+      password,
+      user.password
+    );
 
     if (!passwordMatch) {
       return res.status(401).json({
         success: false,
-        message:
-          "Invalid email or password",
+        message: "Invalid credentials",
       });
     }
 
     let garage = null;
 
     if (user.garageId) {
-      garage =
-        await Garage.findById(
-          user.garageId
-        );
+      garage = await Garage.findById(user.garageId);
 
       if (!garage) {
         return res.status(404).json({
           success: false,
-          message:
-            "Garage not found",
+          message: "Garage not found",
         });
       }
 
-      if (
-        user.role ===
-          "garage_owner" &&
-        garage.status ===
-          "pending"
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Your garage is waiting for admin approval",
-        });
-      }
+      // Only block owner if garage is pending/suspended
+      // (Staff can still log in but see limited features)
+      if (user.role === "garage_owner") {
+        if (garage.status === "pending") {
+          return res.status(403).json({
+            success: false,
+            message:
+              "Your garage is waiting for admin approval",
+          });
+        }
 
-      if (
-        user.role ===
-          "garage_owner" &&
-        garage.status ===
-          "suspended"
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Your garage account has been suspended",
-        });
+        if (garage.status === "suspended") {
+          return res.status(403).json({
+            success: false,
+            message:
+              "Your garage account has been suspended",
+          });
+        }
       }
 
       if (!garage.isActive) {
         return res.status(403).json({
           success: false,
-          message:
-            "Garage account is inactive",
+          message: "Garage account is inactive",
         });
       }
     }
 
-    const accessToken =
-      createAccessToken(user);
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken();
 
-    const refreshToken =
-      createRefreshToken();
+    await saveRefreshToken(user, refreshToken);
 
-    await saveRefreshToken(
-      user,
-      refreshToken
-    );
-
-    user.lastLogin =
-      new Date();
+    user.lastLogin = new Date();
+    user.lastActiveAt = new Date();
 
     await user.save();
 
     return res.json({
       success: true,
-
-      message:
-        "Login successful",
-
+      message: "Login successful",
       accessToken,
-
       refreshToken,
-
-      accessTokenExpiresIn:
-        ACCESS_TOKEN_EXPIRES_IN,
-
-      refreshTokenExpiresIn:
-        "365d",
-
+      accessTokenExpiresIn: ACCESS_TOKEN_EXPIRES_IN,
+      refreshTokenExpiresIn: "365d",
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
+        staffRole: user.staffRole || null,
         garageId: user.garageId,
       },
     });
   } catch (error) {
-    console.error(
-      "Login error:",
-      error
-    );
+    console.error("Login error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Login failed",
+      message: "Login failed",
     });
   }
 };

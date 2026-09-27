@@ -11,15 +11,16 @@ import 'service_details_screen.dart';
 
 class ServicesScreen extends StatefulWidget {
   final String? customerId;
+  final String? vehicleId;
 
   const ServicesScreen({
     super.key,
     this.customerId,
+    this.vehicleId,
   });
 
   @override
-  State<ServicesScreen> createState() =>
-      _ServicesScreenState();
+  State<ServicesScreen> createState() => _ServicesScreenState();
 }
 
 class _ServicesScreenState extends State<ServicesScreen> {
@@ -32,7 +33,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      context.read<ServiceProvider>().fetchServices();
+      _loadServices();
 
       final customerProvider =
           context.read<CustomerProvider>();
@@ -52,31 +53,68 @@ class _ServicesScreenState extends State<ServicesScreen> {
     });
   }
 
+  // ============================================================
+  // LOAD SERVICES (filtered)
+  // ============================================================
+
+  Future<void> _loadServices() async {
+    final provider = context.read<ServiceProvider>();
+
+    debugPrint('=================================');
+    debugPrint('LOADING SERVICES');
+    debugPrint('customerId: ${widget.customerId}');
+    debugPrint('vehicleId: ${widget.vehicleId}');
+    debugPrint('=================================');
+
+    if (widget.customerId != null &&
+        widget.customerId!.isNotEmpty) {
+      debugPrint('Calling fetchCustomerServices...');
+      await provider.fetchCustomerServices(
+        widget.customerId!,
+      );
+      debugPrint(
+        'Services after fetch: ${provider.services.length}',
+      );
+    } else {
+      debugPrint('Calling fetchServices (ALL)...');
+      await provider.fetchServices();
+      debugPrint(
+        'Services after fetch: ${provider.services.length}',
+      );
+    }
+  }
+
+  // ============================================================
+  // FILTER (search + vehicle)
+  // ============================================================
+
   List<ServiceRecord> _filteredServices(
     List<ServiceRecord> services,
   ) {
-    final query = _searchQuery.trim().toLowerCase();
+    var list = services;
 
-    if (query.isEmpty) {
-      return services;
+    if (widget.vehicleId != null &&
+        widget.vehicleId!.isNotEmpty) {
+      list = list
+          .where((s) => s.vehicleId == widget.vehicleId)
+          .toList();
     }
 
-    return services.where((service) {
+    final query = _searchQuery.trim().toLowerCase();
+
+    if (query.isEmpty) return list;
+
+    return list.where((service) {
       final customerName =
           service.customerName?.toLowerCase() ?? '';
-
       final customerPhone =
           service.customerPhone?.toLowerCase() ?? '';
-
       final registration =
           service.registrationNumber?.toLowerCase() ?? '';
-
       final brand =
           service.vehicleBrand?.toLowerCase() ?? '';
-
       final model =
           service.vehicleModel?.toLowerCase() ?? '';
-
       final serviceType =
           service.serviceType.toLowerCase();
 
@@ -89,155 +127,143 @@ class _ServicesScreenState extends State<ServicesScreen> {
     }).toList();
   }
 
+  // ============================================================
+  // ADD SERVICE
+  // ============================================================
+
   Future<void> _addService() async {
-  final customerProvider =
-      context.read<CustomerProvider>();
+    final customerProvider =
+        context.read<CustomerProvider>();
+    final vehicleProvider =
+        context.read<VehicleProvider>();
+    final serviceProvider =
+        context.read<ServiceProvider>();
 
-  final vehicleProvider =
-      context.read<VehicleProvider>();
+    if (customerProvider.customers.isEmpty &&
+        !customerProvider.isLoading) {
+      await customerProvider.fetchCustomers();
+    }
 
-  final serviceProvider =
-      context.read<ServiceProvider>();
+    if (vehicleProvider.vehicles.isEmpty &&
+        !vehicleProvider.isLoading) {
+      await vehicleProvider.fetchVehicles();
+    }
 
-  // Load customers
-  if (customerProvider.customers.isEmpty &&
-      !customerProvider.isLoading) {
-    await customerProvider.fetchCustomers();
-  }
+    if (!mounted) return;
 
-  // Load vehicles
-  if (vehicleProvider.vehicles.isEmpty &&
-      !vehicleProvider.isLoading) {
-    await vehicleProvider.fetchVehicles();
-  }
-
-  if (!mounted) return;
-
-  // Open Add Service Form
-  final service =
-      await Navigator.push<ServiceRecord>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => AddServiceScreen(
-        customers: customerProvider.customers,
-        vehicles: vehicleProvider.vehicles,
-      ),
-    ),
-  );
-
-  if (!mounted || service == null) {
-    return;
-  }
-
-  // ============================================================
-  // SAVE SERVICE TO BACKEND
-  // ============================================================
-
-  final success =
-      await serviceProvider.createService(service);
-
-  if (!mounted) return;
-
-  if (success) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Service saved successfully',
+    final service = await Navigator.push<ServiceRecord>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddServiceScreen(
+          customers: customerProvider.customers,
+          vehicles: vehicleProvider.vehicles,
         ),
       ),
     );
 
-    // Refresh latest backend data
-    await serviceProvider.fetchServices();
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          serviceProvider.error ??
-              'Unable to save service',
+    if (!mounted || service == null) return;
+
+    final success =
+        await serviceProvider.createService(service);
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Service saved • Invoice generated • Sent on WhatsApp',
+          ),
+          duration: Duration(seconds: 4),
         ),
-      ),
-    );
-  }
-}
+      );
 
-Future<void> _editService(
-  ServiceRecord service,
-) async {
-  final customerProvider =
-      context.read<CustomerProvider>();
-
-  final vehicleProvider =
-      context.read<VehicleProvider>();
-
-  final serviceProvider =
-      context.read<ServiceProvider>();
-
-  if (customerProvider.customers.isEmpty &&
-      !customerProvider.isLoading) {
-    await customerProvider.fetchCustomers();
-  }
-
-  if (vehicleProvider.vehicles.isEmpty &&
-      !vehicleProvider.isLoading) {
-    await vehicleProvider.fetchVehicles();
-  }
-
-  if (!mounted) return;
-
-  final updated =
-      await Navigator.push<ServiceRecord>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => AddServiceScreen(
-        customers: customerProvider.customers,
-        vehicles: vehicleProvider.vehicles,
-        service: service,
-      ),
-    ),
-  );
-
-  if (!mounted || updated == null) {
-    return;
+      await _loadServices();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            serviceProvider.error ??
+                'Unable to save service',
+          ),
+        ),
+      );
+    }
   }
 
   // ============================================================
-  // UPDATE SERVICE IN BACKEND
+  // EDIT SERVICE
   // ============================================================
 
-  final success =
-      await serviceProvider.updateService(updated);
+  Future<void> _editService(
+    ServiceRecord service,
+  ) async {
+    final customerProvider =
+        context.read<CustomerProvider>();
+    final vehicleProvider =
+        context.read<VehicleProvider>();
+    final serviceProvider =
+        context.read<ServiceProvider>();
 
-  if (!mounted) return;
+    if (customerProvider.customers.isEmpty &&
+        !customerProvider.isLoading) {
+      await customerProvider.fetchCustomers();
+    }
 
-  if (success) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Service updated successfully',
+    if (vehicleProvider.vehicles.isEmpty &&
+        !vehicleProvider.isLoading) {
+      await vehicleProvider.fetchVehicles();
+    }
+
+    if (!mounted) return;
+
+    final updated =
+        await Navigator.push<ServiceRecord>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddServiceScreen(
+          customers: customerProvider.customers,
+          vehicles: vehicleProvider.vehicles,
+          service: service,
         ),
       ),
     );
 
-    await serviceProvider.fetchServices();
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          serviceProvider.error ??
-              'Unable to update service',
+    if (!mounted || updated == null) return;
+
+    final success =
+        await serviceProvider.updateService(updated);
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Service updated successfully'),
         ),
-      ),
-    );
+      );
+
+      await _loadServices();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            serviceProvider.error ??
+                'Unable to update service',
+          ),
+        ),
+      );
+    }
   }
-}
 
+  // ============================================================
+  // DELETE SERVICE
+  // ============================================================
 
   Future<void> _deleteService(
     ServiceRecord service,
   ) async {
-    final confirmed =
-        await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -249,25 +275,17 @@ Future<void> _editService(
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
+                Navigator.pop(dialogContext, false);
               },
               child: const Text('Cancel'),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor:
-                    Theme.of(context)
-                        .colorScheme
-                        .error,
+                    Theme.of(context).colorScheme.error,
               ),
               onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
+                Navigator.pop(dialogContext, true);
               },
               child: const Text('Delete'),
             ),
@@ -276,17 +294,12 @@ Future<void> _editService(
       },
     );
 
-    if (confirmed != true || !mounted) {
-      return;
-    }
+    if (confirmed != true || !mounted) return;
 
-    final provider =
-        context.read<ServiceProvider>();
+    final provider = context.read<ServiceProvider>();
 
     final success =
-        await provider.deleteService(
-      service.id,
-    );
+        await provider.deleteService(service.id);
 
     if (!mounted) return;
 
@@ -300,46 +313,50 @@ Future<void> _editService(
         ),
       ),
     );
+
+    if (success) {
+      await _loadServices();
+    }
   }
 
-  void _openDetails(
-  ServiceRecord service,
-) {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ServiceDetailsScreen(
-        service: service,
-        customerName:
-            service.customerName ?? 'Unknown Customer',
-        registrationNumber:
-            service.registrationNumber,
-        vehicleBrand:
-            service.vehicleBrand,
-        vehicleModel:
-            service.vehicleModel,
-        onEdit: () {
-          Navigator.pop(context);
-          _editService(service);
-        },
-        onDelete: () {
-          Navigator.pop(context);
-          _deleteService(service);
-        },
+  // ============================================================
+  // OPEN DETAILS
+  // ============================================================
+
+  void _openDetails(ServiceRecord service) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ServiceDetailsScreen(
+          service: service,
+          customerName:
+              service.customerName ?? 'Unknown Customer',
+          registrationNumber: service.registrationNumber,
+          vehicleBrand: service.vehicleBrand,
+          vehicleModel: service.vehicleModel,
+          onEdit: () {
+            Navigator.pop(context);
+            _editService(service);
+          },
+          onDelete: () {
+            Navigator.pop(context);
+            _deleteService(service);
+          },
+        ),
       ),
-    ),
-  );
-}
-  String _statusText(
-    PaymentStatus status,
-  ) {
+    );
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  String _statusText(PaymentStatus status) {
     switch (status) {
       case PaymentStatus.paid:
         return 'Paid';
-
       case PaymentStatus.partiallyPaid:
         return 'Partially Paid';
-
       case PaymentStatus.pending:
         return 'Pending';
     }
@@ -349,39 +366,55 @@ Future<void> _editService(
     BuildContext context,
     PaymentStatus status,
   ) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     switch (status) {
       case PaymentStatus.paid:
         return colors.primary;
-
       case PaymentStatus.partiallyPaid:
         return colors.tertiary;
-
       case PaymentStatus.pending:
         return colors.error;
     }
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ServiceProvider>(
-      builder: (
-        context,
-        provider,
-        child,
-      ) {
-        final services =
-            _filteredServices(
-          provider.services,
-        );
+      builder: (context, provider, child) {
+        // ✅ STEP 1: Provider se saari services lo
+        var services = provider.services;
+
+        // ✅ STEP 2: Agar customerId hai to DEFENSIVE filter
+        if (widget.customerId != null &&
+            widget.customerId!.isNotEmpty) {
+          services = services
+              .where(
+                (s) => s.customerId == widget.customerId,
+              )
+              .toList();
+        }
+
+        // ✅ STEP 3: Vehicle filter + search
+        final filtered = _filteredServices(services);
+
+        final isVehicleFiltered =
+            widget.vehicleId != null &&
+                widget.vehicleId!.isNotEmpty;
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text(
-              'Services',
-              style: TextStyle(
+            title: Text(
+              isVehicleFiltered
+                  ? 'Vehicle Service History'
+                  : widget.customerId != null
+                      ? 'Customer Services'
+                      : 'Services',
+              style: const TextStyle(
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -390,10 +423,8 @@ Future<void> _editService(
                 tooltip: 'Refresh',
                 onPressed: provider.isLoading
                     ? null
-                    : provider.fetchServices,
-                icon: const Icon(
-                  Icons.refresh_rounded,
-                ),
+                    : _loadServices,
+                icon: const Icon(Icons.refresh_rounded),
               ),
             ],
           ),
@@ -401,19 +432,15 @@ Future<void> _editService(
           floatingActionButton:
               FloatingActionButton.extended(
             onPressed:
-                provider.isLoading
-                    ? null
-                    : _addService,
+                provider.isLoading ? null : _addService,
             icon: const Icon(Icons.add),
-            label:
-                const Text('Service'),
+            label: const Text('Service'),
           ),
 
           body: Column(
             children: [
               Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(
+                padding: const EdgeInsets.fromLTRB(
                   20,
                   4,
                   20,
@@ -425,129 +452,82 @@ Future<void> _editService(
                       _searchQuery = value;
                     });
                   },
-                  decoration:
-                      InputDecoration(
+                  decoration: InputDecoration(
                     hintText:
                         'Search service, customer or vehicle',
-                    prefixIcon:
-                        const Icon(
+                    prefixIcon: const Icon(
                       Icons.search_rounded,
                     ),
-                    suffixIcon:
-                        _searchQuery.isNotEmpty
-                            ? IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _searchQuery =
-                                        '';
-                                  });
-                                },
-                                icon:
-                                    const Icon(
-                                  Icons.clear,
-                                ),
-                              )
-                            : null,
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            onPressed: () {
+                              setState(
+                                () => _searchQuery = '',
+                              );
+                            },
+                            icon: const Icon(Icons.clear),
+                          )
+                        : null,
                   ),
                 ),
               ),
 
               if (provider.isLoading &&
-                  provider.services.isNotEmpty)
+                  services.isNotEmpty)
                 const LinearProgressIndicator(),
 
               Expanded(
-                child:
-                    provider.isLoading &&
-                            provider.services
-                                .isEmpty
-                        ? const Center(
-                            child:
-                                CircularProgressIndicator(),
+                child: provider.isLoading &&
+                        services.isEmpty
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : provider.error != null &&
+                            services.isEmpty
+                        ? _ErrorServices(
+                            message: provider.error!,
+                            onRetry: _loadServices,
                           )
-                        : provider.error != null &&
-                                provider.services
-                                    .isEmpty
-                            ? _ErrorServices(
-                                message:
-                                    provider.error!,
-                                onRetry:
-                                    provider
-                                        .fetchServices,
+                        : filtered.isEmpty
+                            ? _EmptyServices(
+                                hasSearch:
+                                    _searchQuery.isNotEmpty,
+                                onAdd: _addService,
                               )
-                            : services.isEmpty
-                                ? _EmptyServices(
-                                    hasSearch:
-                                        _searchQuery
-                                            .isNotEmpty,
-                                    onAdd:
-                                        _addService,
-                                  )
-                                : ListView
-                                    .separated(
-                                    padding:
-                                        const EdgeInsets
-                                            .fromLTRB(
-                                      20,
-                                      0,
-                                      20,
-                                      100,
-                                    ),
-                                    itemCount:
-                                        services
-                                            .length,
-                                    separatorBuilder:
-                                        (
-                                      _,
-                                      _,
-                                    ) =>
-                                            const SizedBox(
-                                      height: 12,
-                                    ),
-                                    itemBuilder:
-                                        (
-                                      context,
-                                      index,
-                                    ) {
-                                      final service =
-                                          services[
-                                              index];
+                            : ListView.separated(
+                                padding:
+                                    const EdgeInsets.fromLTRB(
+                                  20,
+                                  0,
+                                  20,
+                                  100,
+                                ),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder:
+                                    (context, index) {
+                                  final service =
+                                      filtered[index];
 
-                                      return _ServiceCard(
-                                        service:
-                                            service,
-                                        statusText:
-                                            _statusText(
-                                          service
-                                              .paymentStatus,
-                                        ),
-                                        statusColor:
-                                            _statusColor(
-                                          context,
-                                          service
-                                              .paymentStatus,
-                                        ),
-                                        onTap:
-                                            () {
-                                          _openDetails(
-                                            service,
-                                          );
-                                        },
-                                        onEdit:
-                                            () {
-                                          _editService(
-                                            service,
-                                          );
-                                        },
-                                        onDelete:
-                                            () {
-                                          _deleteService(
-                                            service,
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
+                                  return _ServiceCard(
+                                    service: service,
+                                    statusText: _statusText(
+                                      service.paymentStatus,
+                                    ),
+                                    statusColor: _statusColor(
+                                      context,
+                                      service.paymentStatus,
+                                    ),
+                                    onTap: () =>
+                                        _openDetails(service),
+                                    onEdit: () =>
+                                        _editService(service),
+                                    onDelete: () =>
+                                        _deleteService(service),
+                                  );
+                                },
+                              ),
               ),
             ],
           ),
@@ -557,8 +537,11 @@ Future<void> _editService(
   }
 }
 
-class _ServiceCard
-    extends StatelessWidget {
+// ============================================================
+// SERVICE CARD
+// ============================================================
+
+class _ServiceCard extends StatelessWidget {
   final ServiceRecord service;
   final String statusText;
   final Color statusColor;
@@ -575,38 +558,26 @@ class _ServiceCard
     required this.onDelete,
   });
 
-  String _formatDate(
-    DateTime date,
-  ) {
+  String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     return InkWell(
       onTap: onTap,
-      borderRadius:
-          BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding:
-            const EdgeInsets.all(16),
-        decoration:
-            BoxDecoration(
-          color:
-              theme.colorScheme.surface,
-          borderRadius:
-              BorderRadius.circular(18),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: theme
-                .colorScheme
-                .outlineVariant,
+            color: theme.colorScheme.outlineVariant,
           ),
         ),
         child: Column(
@@ -616,28 +587,18 @@ class _ServiceCard
                 Container(
                   width: 52,
                   height: 52,
-                  decoration:
-                      BoxDecoration(
-                    color: theme
-                        .colorScheme
-                        .primaryContainer,
+                  decoration: BoxDecoration(
+                    color:
+                        theme.colorScheme.primaryContainer,
                     borderRadius:
-                        BorderRadius.circular(
-                      15,
-                    ),
+                        BorderRadius.circular(15),
                   ),
                   child: Icon(
                     Icons.build_rounded,
-                    color: theme
-                        .colorScheme
-                        .primary,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
-
-                const SizedBox(
-                  width: 14,
-                ),
-
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment:
@@ -645,83 +606,52 @@ class _ServiceCard
                     children: [
                       Text(
                         service.serviceType,
-                        style: theme
-                            .textTheme
-                            .titleMedium
+                        style: theme.textTheme.titleMedium
                             ?.copyWith(
-                          fontWeight:
-                              FontWeight.w800,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 5,
-                      ),
-
-                      if (service
-                                  .registrationNumber !=
+                      const SizedBox(height: 5),
+                      if (service.registrationNumber !=
                               null &&
                           service
                               .registrationNumber!
                               .isNotEmpty)
                         Text(
-                          service
-                              .registrationNumber!,
-                          style: theme
-                              .textTheme
-                              .bodyMedium
+                          service.registrationNumber!,
+                          style: theme.textTheme.bodyMedium
                               ?.copyWith(
-                            fontWeight:
-                                FontWeight.w600,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-
-                      if (service
-                                  .customerName !=
-                              null &&
-                          service
-                              .customerName!
-                              .isNotEmpty)
+                      if (service.customerName != null &&
+                          service.customerName!.isNotEmpty)
                         Text(
                           service.customerName!,
-                          style: theme
-                              .textTheme
-                              .bodySmall
+                          style: theme.textTheme.bodySmall
                               ?.copyWith(
-                            color: theme
-                                .colorScheme
+                            color: theme.colorScheme
                                 .onSurfaceVariant,
                           ),
                         ),
                     ],
                   ),
                 ),
-
-                PopupMenuButton<
-                    String>(
-                  onSelected:
-                      (value) {
-                    if (value ==
-                        'edit') {
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
                       onEdit();
-                    } else if (value ==
-                        'delete') {
+                    } else if (value == 'delete') {
                       onDelete();
                     }
                   },
-                  itemBuilder:
-                      (context) => const [
+                  itemBuilder: (context) => const [
                     PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(
-                            Icons
-                                .edit_outlined,
-                          ),
-                          SizedBox(
-                            width: 10,
-                          ),
+                          Icon(Icons.edit_outlined),
+                          SizedBox(width: 10),
                           Text('Edit'),
                         ],
                       ),
@@ -730,13 +660,8 @@ class _ServiceCard
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(
-                            Icons
-                                .delete_outline,
-                          ),
-                          SizedBox(
-                            width: 10,
-                          ),
+                          Icon(Icons.delete_outline),
+                          SizedBox(width: 10),
                           Text('Delete'),
                         ],
                       ),
@@ -745,99 +670,59 @@ class _ServiceCard
                 ),
               ],
             ),
-
-            const SizedBox(
-              height: 14,
-            ),
-
-            const Divider(
-              height: 1,
-            ),
-
-            const SizedBox(
-              height: 12,
-            ),
-
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: _SmallInfo(
-                    icon:
-                        Icons.speed_rounded,
+                    icon: Icons.speed_rounded,
                     text:
                         '${service.mileage.toStringAsFixed(0)} km',
                   ),
                 ),
-
                 Expanded(
                   child: _SmallInfo(
-                    icon:
-                        Icons.calendar_today_rounded,
-                    text:
-                        _formatDate(
-                      service.serviceDate,
-                    ),
+                    icon: Icons.calendar_today_rounded,
+                    text: _formatDate(service.serviceDate),
                   ),
                 ),
-
                 Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       '₹${service.totalAmount.toStringAsFixed(0)}',
                       style: const TextStyle(
                         fontSize: 17,
-                        fontWeight:
-                            FontWeight.w800,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-
-                    const SizedBox(
-                      height: 4,
-                    ),
-
+                    const SizedBox(height: 4),
                     Container(
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 4,
                       ),
-                      decoration:
-                          BoxDecoration(
-                        color: statusColor
-                            .withValues(
-                          alpha: 0.10,
-                        ),
+                      decoration: BoxDecoration(
+                        color:
+                            statusColor.withValues(alpha: 0.10),
                         borderRadius:
-                            BorderRadius
-                                .circular(
-                          8,
-                        ),
+                            BorderRadius.circular(8),
                       ),
                       child: Text(
                         statusText,
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight:
-                              FontWeight.w700,
-                          color:
-                              statusColor,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
                         ),
                       ),
                     ),
                   ],
                 ),
-
-                const SizedBox(
-                  width: 4,
-                ),
-
-                const Icon(
-                  Icons
-                      .chevron_right_rounded,
-                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded),
               ],
             ),
           ],
@@ -847,8 +732,11 @@ class _ServiceCard
   }
 }
 
-class _SmallInfo
-    extends StatelessWidget {
+// ============================================================
+// SMALL INFO
+// ============================================================
+
+class _SmallInfo extends StatelessWidget {
   final IconData icon;
   final String text;
 
@@ -858,32 +746,22 @@ class _SmallInfo
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     return Row(
       children: [
         Icon(
           icon,
           size: 17,
-          color: theme
-              .colorScheme
-              .onSurfaceVariant,
+          color: theme.colorScheme.onSurfaceVariant,
         ),
-        const SizedBox(
-          width: 6,
-        ),
+        const SizedBox(width: 6),
         Flexible(
           child: Text(
             text,
-            overflow:
-                TextOverflow.ellipsis,
-            style: theme
-                .textTheme
-                .bodySmall,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall,
           ),
         ),
       ],
@@ -891,8 +769,11 @@ class _SmallInfo
   }
 }
 
-class _EmptyServices
-    extends StatelessWidget {
+// ============================================================
+// EMPTY
+// ============================================================
+
+class _EmptyServices extends StatelessWidget {
   final bool hasSearch;
   final VoidCallback onAdd;
 
@@ -902,70 +783,45 @@ class _EmptyServices
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     return Center(
       child: Padding(
-        padding:
-            const EdgeInsets.all(30),
+        padding: const EdgeInsets.all(30),
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               hasSearch
-                  ? Icons
-                      .search_off_rounded
-                  : Icons
-                      .build_circle_outlined,
+                  ? Icons.search_off_rounded
+                  : Icons.build_circle_outlined,
               size: 70,
-              color: theme
-                  .colorScheme
-                  .primary,
+              color: theme.colorScheme.primary,
             ),
-
-            const SizedBox(
-              height: 18,
-            ),
-
+            const SizedBox(height: 18),
             Text(
               hasSearch
                   ? 'No services found'
                   : 'No services yet',
               style: const TextStyle(
                 fontSize: 20,
-                fontWeight:
-                    FontWeight.w800,
+                fontWeight: FontWeight.w800,
               ),
             ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
+            const SizedBox(height: 8),
             Text(
               hasSearch
                   ? 'Try another customer, vehicle or service name.'
                   : 'Add your first service record to start tracking garage work.',
-              textAlign:
-                  TextAlign.center,
+              textAlign: TextAlign.center,
             ),
-
             if (!hasSearch) ...[
-              const SizedBox(
-                height: 22,
-              ),
+              const SizedBox(height: 22),
               FilledButton.icon(
                 onPressed: onAdd,
-                icon:
-                    const Icon(Icons.add),
-                label: const Text(
-                  'Add Service',
-                ),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Service'),
               ),
             ],
           ],
@@ -975,8 +831,11 @@ class _EmptyServices
   }
 }
 
-class _ErrorServices
-    extends StatelessWidget {
+// ============================================================
+// ERROR
+// ============================================================
+
+class _ErrorServices extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
@@ -986,57 +845,35 @@ class _ErrorServices
   });
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding:
-            const EdgeInsets.all(30),
+        padding: const EdgeInsets.all(30),
         child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons
-                  .cloud_off_rounded,
+              Icons.cloud_off_rounded,
               size: 60,
             ),
-
-            const SizedBox(
-              height: 16,
-            ),
-
+            const SizedBox(height: 16),
             const Text(
               'Unable to load services',
               style: TextStyle(
                 fontSize: 19,
-                fontWeight:
-                    FontWeight.w800,
+                fontWeight: FontWeight.w800,
               ),
             ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
+            const SizedBox(height: 8),
             Text(
               message,
-              textAlign:
-                  TextAlign.center,
+              textAlign: TextAlign.center,
             ),
-
-            const SizedBox(
-              height: 20,
-            ),
-
+            const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onRetry,
-              icon: const Icon(
-                Icons.refresh_rounded,
-              ),
-              label:
-                  const Text('Retry'),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry'),
             ),
           ],
         ),

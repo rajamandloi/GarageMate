@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/utils/phone_helper.dart';
 import '../models/customer.dart';
 import '../providers/customer_provider.dart';
 
 import '../../vehicles/models/vehicle.dart';
 import '../../vehicles/providers/vehicle_provider.dart';
 import '../../vehicles/screens/add_vehicle_screen.dart';
+import '../../vehicles/screens/vehicle_details_screen.dart';
 
 import '../../services/models/service_record.dart';
 import '../../services/providers/service_provider.dart';
@@ -42,14 +45,14 @@ class _CustomerDetailsScreenState
   String? _error;
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    _loadCustomerData();
-  });
-}
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadCustomerData();
+    });
+  }
 
   // ============================================================
   // LOAD CUSTOMER DATA
@@ -70,8 +73,7 @@ void initState() {
       final serviceProvider =
           context.read<ServiceProvider>();
 
-      final vehicles =
-          await vehicleProvider.fetchCustomerVehicles(
+      await vehicleProvider.fetchCustomerVehicles(
         widget.customer.id,
       );
 
@@ -134,7 +136,10 @@ void initState() {
       return;
     }
 
-    final result = await Navigator.push(
+    final serviceProvider =
+        context.read<ServiceProvider>();
+
+    final service = await Navigator.push<ServiceRecord>(
       context,
       MaterialPageRoute(
         builder: (_) => AddServiceScreen(
@@ -144,14 +149,32 @@ void initState() {
       ),
     );
 
+    if (!mounted || service == null) return;
+
+    // ✅ SAVE THE SERVICE
+    final success =
+        await serviceProvider.createService(service);
+
     if (!mounted) return;
 
-    if (result != null) {
+    if (success) {
       await _loadCustomerData();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Service added successfully.'),
+          content: Text(
+            'Service saved • Invoice generated • Sent on WhatsApp',
+          ),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            serviceProvider.error ??
+                'Unable to save service',
+          ),
         ),
       );
     }
@@ -196,31 +219,129 @@ void initState() {
   }
 
   // ============================================================
+  // OPEN VEHICLE DETAILS
+  // ============================================================
+
+  void _openVehicleDetails(Vehicle vehicle) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VehicleDetailsScreen(
+          vehicle: vehicle,
+          onEdit: () {
+            Navigator.pop(context);
+          },
+          onDelete: () {
+            Navigator.pop(context);
+          },
+        ),
+      ),
+    ).then((_) {
+      if (!mounted) return;
+      _loadCustomerData();
+    });
+  }
+
+  // ============================================================
   // CALL
   // ============================================================
 
-  void _callCustomer() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Call: ${widget.customer.phone}',
+  Future<void> _callCustomer() async {
+    final phone = widget.customer.phone;
+
+    if (phone.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Phone number not available'),
         ),
-      ),
-    );
+      );
+      return;
+    }
+
+    final waNumber = PhoneHelper.toWhatsAppNumber(phone);
+
+    if (waNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid phone number'),
+        ),
+      );
+      return;
+    }
+
+    final uri = Uri.parse('tel:+$waNumber');
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to open dialer'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to call: $e'),
+        ),
+      );
+    }
   }
 
   // ============================================================
   // WHATSAPP
   // ============================================================
 
-  void _whatsappCustomer() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'WhatsApp: ${widget.customer.phone}',
+  Future<void> _whatsappCustomer() async {
+    final phone = widget.customer.phone;
+
+    if (phone.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Phone number not available'),
         ),
-      ),
+      );
+      return;
+    }
+
+    final message =
+        'Hello ${widget.customer.name},\n\n'
+        'This is from our garage.';
+
+    final url = PhoneHelper.buildWhatsAppUrl(
+      phone: phone,
+      message: message,
     );
+
+    try {
+      final launched = await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to open WhatsApp. Please install WhatsApp.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to open WhatsApp: $e'),
+        ),
+      );
+    }
   }
 
   // ============================================================
@@ -259,16 +380,12 @@ void initState() {
             tooltip: 'Refresh',
             onPressed:
                 _isLoading ? null : _loadCustomerData,
-            icon: const Icon(
-              Icons.refresh_rounded,
-            ),
+            icon: const Icon(Icons.refresh_rounded),
           ),
           IconButton(
             tooltip: 'Edit Customer',
             onPressed: widget.onEdit,
-            icon: const Icon(
-              Icons.edit_outlined,
-            ),
+            icon: const Icon(Icons.edit_outlined),
           ),
           IconButton(
             tooltip: 'Delete Customer',
@@ -286,10 +403,7 @@ void initState() {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
-            // ==================================================
-            // CUSTOMER HEADER
-            // ==================================================
-
+            // HEADER
             Center(
               child: CircleAvatar(
                 radius: 42,
@@ -335,10 +449,7 @@ void initState() {
 
             const SizedBox(height: 26),
 
-            // ==================================================
             // CALL / WHATSAPP
-            // ==================================================
-
             Row(
               children: [
                 Expanded(
@@ -361,19 +472,11 @@ void initState() {
 
             const SizedBox(height: 26),
 
-            // ==================================================
-            // LOADING
-            // ==================================================
-
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.only(bottom: 20),
                 child: LinearProgressIndicator(),
               ),
-
-            // ==================================================
-            // ERROR
-            // ==================================================
 
             if (_error != null)
               _ErrorCard(
@@ -381,10 +484,7 @@ void initState() {
                 onRetry: _loadCustomerData,
               ),
 
-            // ==================================================
             // PERSONAL INFORMATION
-            // ==================================================
-
             _SectionCard(
               title: 'Personal Information',
               children: [
@@ -393,20 +493,17 @@ void initState() {
                   title: 'Name',
                   value: customer.name,
                 ),
-
                 _InfoRow(
                   icon: Icons.phone_outlined,
                   title: 'Mobile',
                   value: customer.phone,
                 ),
-
                 if (customer.email.isNotEmpty)
                   _InfoRow(
                     icon: Icons.email_outlined,
                     title: 'Email',
                     value: customer.email,
                   ),
-
                 if (customer.address.isNotEmpty)
                   _InfoRow(
                     icon: Icons.location_on_outlined,
@@ -418,16 +515,12 @@ void initState() {
 
             const SizedBox(height: 16),
 
-            // ==================================================
             // VEHICLES
-            // ==================================================
-
             _SectionCard(
               title: 'Vehicles',
               children: [
                 _InfoRow(
-                  icon:
-                      Icons.directions_car_outlined,
+                  icon: Icons.directions_car_outlined,
                   title: 'Total Vehicles',
                   value: _vehicles.length.toString(),
                 ),
@@ -438,10 +531,8 @@ void initState() {
                   ..._vehicles.map(
                     (vehicle) => _VehicleRow(
                       vehicle: vehicle,
-                      onTap: () {
-                        // Vehicle details can be opened
-                        // from the vehicle list later.
-                      },
+                      onTap: () =>
+                          _openVehicleDetails(vehicle),
                     ),
                   ),
 
@@ -467,10 +558,7 @@ void initState() {
 
             const SizedBox(height: 16),
 
-            // ==================================================
             // SERVICE HISTORY
-            // ==================================================
-
             _SectionCard(
               title: 'Service History',
               children: [
@@ -482,7 +570,6 @@ void initState() {
 
                 if (_services.isNotEmpty) ...[
                   const SizedBox(height: 8),
-
                   _InfoRow(
                     icon: Icons.history_rounded,
                     title: 'Last Service',
@@ -490,12 +577,11 @@ void initState() {
                       _services.first.serviceDate,
                     ),
                   ),
-
                   _InfoRow(
-                    icon:
-                        Icons.event_available_outlined,
+                    icon: Icons.event_available_outlined,
                     title: 'Next Service',
-                    value: _services.first
+                    value: _services
+                                .first
                                 .nextServiceDate !=
                             null
                         ? _formatDate(
@@ -518,13 +604,10 @@ void initState() {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed:
-                        _isLoading
-                            ? null
-                            : _openServiceHistory,
-                    icon: const Icon(
-                      Icons.history_rounded,
-                    ),
+                    onPressed: _isLoading
+                        ? null
+                        : _openServiceHistory,
+                    icon: const Icon(Icons.history_rounded),
                     label: const Text(
                       'View Service History',
                     ),
@@ -535,10 +618,7 @@ void initState() {
 
             const SizedBox(height: 16),
 
-            // ==================================================
             // QUICK ACTIONS
-            // ==================================================
-
             _SectionCard(
               title: 'Quick Actions',
               children: [
@@ -547,22 +627,15 @@ void initState() {
                   child: FilledButton.icon(
                     onPressed:
                         _isLoading ? null : _addService,
-                    icon: const Icon(
-                      Icons.build_outlined,
-                    ),
-                    label: const Text(
-                      'Add Service',
-                    ),
+                    icon: const Icon(Icons.build_outlined),
+                    label: const Text('Add Service'),
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed:
-                        _openReminders,
+                    onPressed: _openReminders,
                     icon: const Icon(
                       Icons.notifications_outlined,
                     ),
@@ -625,9 +698,7 @@ class _VehicleRow extends StatelessWidget {
                 color: theme.colorScheme.primary,
               ),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment:
@@ -640,17 +711,15 @@ class _VehicleRow extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-
                   const SizedBox(height: 3),
-
                   Text(
                     '${vehicle.brand} ${vehicle.model}',
-                    style:
-                        theme.textTheme.bodySmall,
+                    style: theme.textTheme.bodySmall,
                   ),
                 ],
               ),
             ),
+            const Icon(Icons.chevron_right_rounded),
           ],
         ),
       ),
@@ -770,9 +839,7 @@ class _SectionCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-
           const SizedBox(height: 14),
-
           ...children,
         ],
       ),
@@ -811,9 +878,7 @@ class _InfoRow extends StatelessWidget {
             size: 21,
             color: theme.colorScheme.primary,
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -827,9 +892,7 @@ class _InfoRow extends StatelessWidget {
                         .onSurfaceVariant,
                   ),
                 ),
-
                 const SizedBox(height: 2),
-
                 Text(
                   value,
                   style:

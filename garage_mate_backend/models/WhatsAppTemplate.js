@@ -18,7 +18,7 @@ const whatsappTemplateSchema = new mongoose.Schema(
 
     language: {
       type: String,
-      default: "en_US",
+      default: "en",
       trim: true,
     },
 

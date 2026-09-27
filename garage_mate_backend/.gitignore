@@ -10,3 +10,8 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+# Firebase
+config/firebase-service-account.json
+*.json
+!package.json
+!package-lock.json

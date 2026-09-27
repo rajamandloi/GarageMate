@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'business_profile_screen.dart';
+import '../../screens/whatsapp/whatsapp_send_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -29,9 +30,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
         children: [
-          _SectionTitle(
-            title: 'General',
-          ),
+          // ==========================================================
+          // GENERAL
+          // ==========================================================
+          _SectionTitle(title: 'General'),
 
           const SizedBox(height: 10),
 
@@ -55,9 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.dark_mode_outlined,
             title: 'Appearance',
             subtitle: 'Manage app appearance',
-            trailing: const Icon(
-              Icons.chevron_right_rounded,
-            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               _showAppearanceDialog();
             },
@@ -65,9 +65,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 24),
 
-          _SectionTitle(
-            title: 'WhatsApp',
-          ),
+          // ==========================================================
+          // WHATSAPP
+          // ==========================================================
+          _SectionTitle(title: 'WhatsApp'),
 
           const SizedBox(height: 10),
 
@@ -83,6 +84,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 });
               },
             ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // ⭐ NAYA CARD — SEND ON WHATSAPP
+          _SettingsCard(
+            icon: Icons.send_rounded,
+            title: 'Send on WhatsApp',
+            subtitle: 'Send invoices, offers & reminders',
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const WhatsAppSendScreen(),
+                ),
+              );
+            },
           ),
 
           const SizedBox(height: 10),
@@ -103,9 +122,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 24),
 
-          _SectionTitle(
-            title: 'Business',
-          ),
+          // ==========================================================
+          // BUSINESS
+          // ==========================================================
+          _SectionTitle(title: 'Business'),
 
           const SizedBox(height: 10),
 
@@ -113,17 +133,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.store_outlined,
             title: 'Business Profile',
             subtitle: 'Manage garage information',
-            trailing: const Icon(
-              Icons.chevron_right_rounded,
-            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const BusinessProfileScreen(),
-    ),
-  );
-},
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const BusinessProfileScreen(),
+                ),
+              );
+            },
           ),
 
           const SizedBox(height: 10),
@@ -132,9 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.message_outlined,
             title: 'Message Templates',
             subtitle: 'Manage customer message templates',
-            trailing: const Icon(
-              Icons.chevron_right_rounded,
-            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               _showComingSoon('Message Templates');
             },
@@ -142,9 +158,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 24),
 
-          _SectionTitle(
-            title: 'Data',
-          ),
+          // ==========================================================
+          // DATA
+          // ==========================================================
+          _SectionTitle(title: 'Data'),
 
           const SizedBox(height: 10),
 
@@ -152,9 +169,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.cloud_upload_outlined,
             title: 'Backup & Sync',
             subtitle: 'Manage your garage data',
-            trailing: const Icon(
-              Icons.chevron_right_rounded,
-            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               _showComingSoon('Backup & Sync');
             },
@@ -174,9 +189,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 24),
 
-          _SectionTitle(
-            title: 'About',
-          ),
+          // ==========================================================
+          // ABOUT
+          // ==========================================================
+          _SectionTitle(title: 'About'),
 
           const SizedBox(height: 10),
 
@@ -184,9 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.info_outline_rounded,
             title: 'About GarageMate',
             subtitle: 'Version 1.0.0',
-            trailing: const Icon(
-              Icons.chevron_right_rounded,
-            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               _showAboutDialog();
             },
@@ -218,6 +232,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
+  // ============================================================
+  // DIALOGS
+  // ============================================================
 
   void _showAppearanceDialog() {
     showDialog<void>(
@@ -288,12 +306,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: () {
                 Navigator.pop(context);
 
-                ScaffoldMessenger.of(this.context)
-                    .showSnackBar(
+                ScaffoldMessenger.of(this.context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Local data cleared.',
-                    ),
+                    content: Text('Local data cleared.'),
                   ),
                 );
               },
@@ -310,11 +325,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       applicationName: 'GarageMate',
       applicationVersion: '1.0.0',
-      applicationLegalese:
-          'Garage management made simple.',
+      applicationLegalese: 'Garage management made simple.',
     );
   }
 }
+
+// ============================================================
+// SECTION TITLE
+// ============================================================
 
 class _SectionTitle extends StatelessWidget {
   final String title;
@@ -334,6 +352,10 @@ class _SectionTitle extends StatelessWidget {
     );
   }
 }
+
+// ============================================================
+// SETTINGS CARD
+// ============================================================
 
 class _SettingsCard extends StatelessWidget {
   final IconData icon;
@@ -376,22 +398,19 @@ class _SettingsCard extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: (iconColor ??
-                          theme.colorScheme.primary)
+                  color: (iconColor ?? theme.colorScheme.primary)
                       .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   icon,
-                  color:
-                      iconColor ?? theme.colorScheme.primary,
+                  color: iconColor ?? theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
@@ -404,9 +423,7 @@ class _SettingsCard extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 13,
-                        color: theme
-                            .colorScheme
-                            .onSurfaceVariant,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],

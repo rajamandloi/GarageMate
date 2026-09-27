@@ -3,8 +3,12 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'core/providers/language_provider.dart';
+import 'core/providers/theme_provider.dart';
+import 'core/services/language_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 
@@ -16,6 +20,14 @@ import 'features/reminders/providers/reminder_provider.dart';
 import 'features/services/providers/service_provider.dart';
 import 'features/splash/screens/splash_screen.dart';
 import 'features/vehicles/providers/vehicle_provider.dart';
+import 'features/subscription/providers/subscription_provider.dart';
+import 'features/search/providers/search_provider.dart';
+import 'features/analytics/providers/analytics_provider.dart';
+import 'features/invoice_settings/providers/invoice_settings_provider.dart';
+import 'features/staff/providers/staff_provider.dart';
+import 'core/providers/user_provider.dart';
+
+import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,8 +57,7 @@ class GarageMateApp extends StatefulWidget {
       _GarageMateAppState();
 }
 
-class _GarageMateAppState
-    extends State<GarageMateApp> {
+class _GarageMateAppState extends State<GarageMateApp> {
   final AppLinks _appLinks = AppLinks();
 
   StreamSubscription<Uri>? _linkSubscription;
@@ -63,77 +74,46 @@ class _GarageMateAppState
   // ============================================================
 
   Future<void> _initDeepLinks() async {
-    // App already running / resumed
-    _linkSubscription =
-        _appLinks.uriLinkStream.listen(
+    _linkSubscription = _appLinks.uriLinkStream.listen(
       _handleDeepLink,
       onError: (error) {
-        debugPrint(
-          'Deep link error: $error',
-        );
+        debugPrint('Deep link error: $error');
       },
     );
 
-    // App opened directly from email link
     try {
-      final initialUri =
-          await _appLinks.getInitialLink();
+      final initialUri = await _appLinks.getInitialLink();
 
       if (initialUri != null) {
         _handleDeepLink(initialUri);
       }
     } catch (error) {
-      debugPrint(
-        'Initial deep link error: $error',
-      );
+      debugPrint('Initial deep link error: $error');
     }
   }
 
-  // ============================================================
-  // HANDLE DEEP LINK
-  // ============================================================
-
   void _handleDeepLink(Uri uri) {
-    debugPrint(
-      'GarageMate deep link: $uri',
-    );
+    debugPrint('GarageMate deep link: $uri');
 
-    if (uri.scheme != 'garagemate') {
-      return;
-    }
+    if (uri.scheme != 'garagemate') return;
+    if (uri.host != 'reset-password') return;
 
-    if (uri.host != 'reset-password') {
-      return;
-    }
-
-    final token =
-        uri.queryParameters['token'];
+    final token = uri.queryParameters['token'];
 
     if (token == null || token.isEmpty) {
-      debugPrint(
-        'Reset token missing',
-      );
-
+      debugPrint('Reset token missing');
       return;
     }
 
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      final navigator =
-          navigatorKey.currentState;
-
-      if (navigator == null) {
-        return;
-      }
+      final navigator = navigatorKey.currentState;
+      if (navigator == null) return;
 
       navigator.push(
         MaterialPageRoute(
-          builder: (_) =>
-              ResetPasswordScreen(
-            token: token,
-          ),
+          builder: (_) => ResetPasswordScreen(token: token),
         ),
       );
     });
@@ -142,7 +122,6 @@ class _GarageMateAppState
   @override
   void dispose() {
     _linkSubscription?.cancel();
-
     super.dispose();
   }
 
@@ -155,40 +134,95 @@ class _GarageMateAppState
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
+          create: (_) => LanguageProvider()..init(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider()..init(),
+        ),
+        ChangeNotifierProvider(
+  create: (_) => UserProvider(),
+),
+        ChangeNotifierProvider(
           create: (_) => CustomerProvider(),
         ),
-
         ChangeNotifierProvider(
           create: (_) => VehicleProvider(),
         ),
-
         ChangeNotifierProvider(
           create: (_) => ServiceProvider(),
         ),
-
         ChangeNotifierProvider(
           create: (_) => ReminderProvider(),
         ),
-
         ChangeNotifierProvider(
           create: (_) => DashboardProvider(),
         ),
+        ChangeNotifierProvider(
+          create: (_) => SubscriptionProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SearchProvider(),
+        ),
+        ChangeNotifierProvider(
+  create: (_) => AnalyticsProvider(),
+),
+ChangeNotifierProvider(
+  create: (_) => InvoiceSettingsProvider(),
+),
+ChangeNotifierProvider(
+  create: (_) => StaffProvider(),
+),
       ],
+      child: Consumer2<LanguageProvider, ThemeProvider>(
+        builder: (
+          context,
+          languageProvider,
+          themeProvider,
+          child,
+        ) {
+          // Wait until language is loaded
+          if (languageProvider.isLoading) {
+            return MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: themeProvider.themeMode,
+              home: const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            );
+          }
 
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
+          return MaterialApp(
+            navigatorKey: navigatorKey,
+            debugShowCheckedModeBanner: false,
+            title: 'GarageMate',
 
-        debugShowCheckedModeBanner: false,
+            // ================================================
+            // LOCALIZATION
+            // ================================================
+            locale: languageProvider.locale,
+            supportedLocales:
+                LanguageService.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
 
-        title: 'GarageMate',
+            // ================================================
+            // THEME
+            // ================================================
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
 
-        theme: AppTheme.lightTheme,
-
-        darkTheme: AppTheme.darkTheme,
-
-        themeMode: ThemeMode.system,
-
-        home: const SplashScreen(),
+            home: const SplashScreen(),
+          );
+        },
       ),
     );
   }
@@ -198,6 +232,5 @@ class _GarageMateAppState
 // GLOBAL NAVIGATOR KEY
 // ============================================================
 
-final GlobalKey<NavigatorState>
-    navigatorKey =
+final GlobalKey<NavigatorState> navigatorKey =
     GlobalKey<NavigatorState>();

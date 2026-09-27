@@ -2,13 +2,16 @@ const express = require("express");
 
 const {
   getReminders,
-  getCustomerReminders,
-  getVehicleReminders,
+  getCustomerReminders,   // ✅ NAYA
+  getVehicleReminders,    // ✅ NAYA
+  getReminderById,
   createReminder,
   updateReminder,
   completeReminder,
   cancelReminder,
   deleteReminder,
+  bulkDeleteReminders,
+  deleteCompletedReminders,
 } = require("../controllers/reminderController");
 
 const protect = require("../middleware/authMiddleware");
@@ -16,13 +19,32 @@ const requireGarage = require("../middleware/garageMiddleware");
 
 const router = express.Router();
 
-router.get(
-  "/",
+// ============================================================
+// REMINDER ROUTES
+// Base URL: /api/reminders
+// ============================================================
+
+// ⚠️ IMPORTANT ORDER:
+// 1. Specific string routes pehle
+// 2. Dynamic routes baad mein
+
+// Delete all completed / cancelled reminders
+router.delete(
+  "/completed",
   protect,
   requireGarage,
-  getReminders
+  deleteCompletedReminders
 );
 
+// Bulk delete
+router.post(
+  "/bulk-delete",
+  protect,
+  requireGarage,
+  bulkDeleteReminders
+);
+
+// ✅ Get customer reminders (NEW)
 router.get(
   "/customer/:customerId",
   protect,
@@ -30,6 +52,7 @@ router.get(
   getCustomerReminders
 );
 
+// ✅ Get vehicle reminders (NEW)
 router.get(
   "/vehicle/:vehicleId",
   protect,
@@ -37,20 +60,19 @@ router.get(
   getVehicleReminders
 );
 
-router.post(
-  "/",
-  protect,
-  requireGarage,
-  createReminder
-);
+// Get all reminders
+router.get("/", protect, requireGarage, getReminders);
 
-router.put(
-  "/:id",
-  protect,
-  requireGarage,
-  updateReminder
-);
+// Get single reminder
+router.get("/:id", protect, requireGarage, getReminderById);
 
+// Create reminder
+router.post("/", protect, requireGarage, createReminder);
+
+// Update reminder
+router.put("/:id", protect, requireGarage, updateReminder);
+
+// Complete reminder
 router.patch(
   "/:id/complete",
   protect,
@@ -58,6 +80,7 @@ router.patch(
   completeReminder
 );
 
+// Cancel reminder
 router.patch(
   "/:id/cancel",
   protect,
@@ -65,11 +88,7 @@ router.patch(
   cancelReminder
 );
 
-router.delete(
-  "/:id",
-  protect,
-  requireGarage,
-  deleteReminder
-);
+// Delete single reminder
+router.delete("/:id", protect, requireGarage, deleteReminder);
 
 module.exports = router;

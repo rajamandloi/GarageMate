@@ -1,6 +1,7 @@
 const express = require("express");
 
 const protect = require("../middleware/authMiddleware");
+const requireGarage = require("../middleware/garageMiddleware");
 const { createRateLimiter } = require("../middleware/securityMiddleware");
 
 const webhookRateLimiter = createRateLimiter({
@@ -9,12 +10,20 @@ const webhookRateLimiter = createRateLimiter({
   message: "Too many webhook requests",
 });
 
+const sendRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: "Too many WhatsApp send requests. Please slow down.",
+});
+
 const {
   getIntegration,
   saveIntegration,
   disconnectWhatsApp,
   verifyWebhook,
   receiveWebhook,
+  sendTemplateMessage,
+  sendTemplateMessageWithPdf,
 } = require("../controllers/whatsappController");
 
 const router = express.Router();
@@ -23,44 +32,36 @@ const router = express.Router();
 // GARAGE WHATSAPP SETTINGS
 // ============================================================
 
-// Get current garage WhatsApp configuration
-router.get(
-  "/integration",
+router.get("/integration", protect, getIntegration);
+router.put("/integration", protect, saveIntegration);
+router.delete("/integration", protect, disconnectWhatsApp);
+
+// ============================================================
+// SEND MESSAGES
+// ============================================================
+
+router.post(
+  "/send",
   protect,
-  getIntegration
+  requireGarage,
+  sendRateLimiter,
+  sendTemplateMessage
 );
 
-// Save / update current garage WhatsApp configuration
-router.put(
-  "/integration",
+router.post(
+  "/send-with-pdf",
   protect,
-  saveIntegration
+  requireGarage,
+  sendRateLimiter,
+  sendTemplateMessageWithPdf
 );
-
-// Disconnect current garage WhatsApp
-router.delete(
-  "/integration",
-  protect,
-  disconnectWhatsApp
-);
-
 
 // ============================================================
 // META WHATSAPP WEBHOOK
 // ============================================================
 
-// Meta webhook verification
-router.get(
-  "/webhook",
-  verifyWebhook
-);
+router.get("/webhook", verifyWebhook);
 
-// Meta webhook events
-router.post(
-  "/webhook",
-  webhookRateLimiter,
-  receiveWebhook
-);
-
+router.post("/webhook", webhookRateLimiter, receiveWebhook);
 
 module.exports = router;

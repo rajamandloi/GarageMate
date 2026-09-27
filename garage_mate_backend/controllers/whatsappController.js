@@ -8,11 +8,14 @@ const {
   addConversationMessage,
 } = require("../services/whatsappConversationService");
 
-const { generateAIResponse } =
-  require("../services/aiService");
+const {
+  generateAIResponse,
+} = require("../services/aiService");
 
 const {
   sendWhatsAppMessage,
+  sendWhatsAppTemplate,
+  sendWhatsAppTemplateWithPdf,
 } = require("../services/whatsappService");
 
 // ============================================================
@@ -27,25 +30,20 @@ const getIntegration = async (req, res) => {
     if (!garageId) {
       return res.status(400).json({
         success: false,
-        message:
-          "Garage is not associated with this account",
+        message: "Garage is not associated with this account",
       });
     }
 
-    const integration =
-      await WhatsAppIntegration.findOne({
-        garageId,
-      }).select("-accessToken");
+    const integration = await WhatsAppIntegration.findOne({
+      garageId,
+    }).select("-accessToken");
 
     return res.status(200).json({
       success: true,
       integration: integration || null,
     });
   } catch (error) {
-    console.error(
-      "Get WhatsApp integration error:",
-      error
-    );
+    console.error("Get WhatsApp integration error:", error);
 
     return res.status(500).json({
       success: false,
@@ -66,8 +64,7 @@ const saveIntegration = async (req, res) => {
     if (!garageId) {
       return res.status(400).json({
         success: false,
-        message:
-          "Garage is not associated with this account",
+        message: "Garage is not associated with this account",
       });
     }
 
@@ -92,61 +89,50 @@ const saveIntegration = async (req, res) => {
       businessHours,
     } = req.body;
 
-    let integration =
-      await WhatsAppIntegration.findOne({
-        garageId,
-      });
+    let integration = await WhatsAppIntegration.findOne({
+      garageId,
+    });
 
     if (!integration) {
-      integration =
-        new WhatsAppIntegration({
-          garageId,
-        });
+      integration = new WhatsAppIntegration({
+        garageId,
+      });
     }
 
     if (businessAccountId !== undefined) {
-      integration.businessAccountId =
-        String(businessAccountId).trim();
+      integration.businessAccountId = String(businessAccountId).trim();
     }
 
     if (phoneNumberId !== undefined) {
-      integration.phoneNumberId =
-        String(phoneNumberId).trim();
+      integration.phoneNumberId = String(phoneNumberId).trim();
     }
 
     if (displayPhoneNumber !== undefined) {
-      integration.displayPhoneNumber =
-        String(displayPhoneNumber).trim();
+      integration.displayPhoneNumber = String(displayPhoneNumber).trim();
     }
 
     if (accessToken !== undefined) {
-      integration.accessToken =
-        String(accessToken).trim();
+      integration.accessToken = String(accessToken).trim();
     }
 
     if (aiEnabled !== undefined) {
-      integration.aiEnabled =
-        Boolean(aiEnabled);
+      integration.aiEnabled = Boolean(aiEnabled);
     }
 
     if (aiName !== undefined) {
-      integration.aiName =
-        String(aiName).trim();
+      integration.aiName = String(aiName).trim();
     }
 
     if (greeting !== undefined) {
-      integration.greeting =
-        String(greeting).trim();
+      integration.greeting = String(greeting).trim();
     }
 
     if (aiInstructions !== undefined) {
-      integration.aiInstructions =
-        String(aiInstructions).trim();
+      integration.aiInstructions = String(aiInstructions).trim();
     }
 
     if (businessHours !== undefined) {
-      integration.businessHours =
-        String(businessHours).trim();
+      integration.businessHours = String(businessHours).trim();
     }
 
     integration.isConnected = true;
@@ -156,26 +142,20 @@ const saveIntegration = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message:
-        "WhatsApp integration saved successfully",
-      integration:
-        integration.toObject({
-          transform: (doc, ret) => {
-            delete ret.accessToken;
-            return ret;
-          },
-        }),
+      message: "WhatsApp integration saved successfully",
+      integration: integration.toObject({
+        transform: (doc, ret) => {
+          delete ret.accessToken;
+          return ret;
+        },
+      }),
     });
   } catch (error) {
-    console.error(
-      "Save WhatsApp integration error:",
-      error
-    );
+    console.error("Save WhatsApp integration error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to save WhatsApp integration",
+      message: "Unable to save WhatsApp integration",
     });
   }
 };
@@ -192,21 +172,18 @@ const disconnectWhatsApp = async (req, res) => {
     if (!garageId) {
       return res.status(400).json({
         success: false,
-        message:
-          "Garage is not associated with this account",
+        message: "Garage is not associated with this account",
       });
     }
 
-    const integration =
-      await WhatsAppIntegration.findOne({
-        garageId,
-      });
+    const integration = await WhatsAppIntegration.findOne({
+      garageId,
+    });
 
     if (!integration) {
       return res.status(404).json({
         success: false,
-        message:
-          "WhatsApp integration not found",
+        message: "WhatsApp integration not found",
       });
     }
 
@@ -222,19 +199,14 @@ const disconnectWhatsApp = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message:
-        "WhatsApp disconnected successfully",
+      message: "WhatsApp disconnected successfully",
     });
   } catch (error) {
-    console.error(
-      "Disconnect WhatsApp error:",
-      error
-    );
+    console.error("Disconnect WhatsApp error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to disconnect WhatsApp",
+      message: "Unable to disconnect WhatsApp",
     });
   }
 };
@@ -248,52 +220,30 @@ const verifyWebhook = async (req, res) => {
   try {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
-    const challenge =
-      req.query["hub.challenge"];
+    const challenge = req.query["hub.challenge"];
 
-    const verifyToken =
-      process.env.WHATSAPP_VERIFY_TOKEN;
+    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
-    if (
-      mode !== "subscribe" ||
-      !token ||
-      !verifyToken
-    ) {
+    if (mode !== "subscribe" || !token || !verifyToken) {
       return res.status(403).send("Forbidden");
     }
 
-    const tokenBuffer =
-      Buffer.from(String(token));
+    const tokenBuffer = Buffer.from(String(token));
+    const verifyTokenBuffer = Buffer.from(String(verifyToken));
 
-    const verifyTokenBuffer =
-      Buffer.from(String(verifyToken));
-
-    if (
-      tokenBuffer.length !==
-      verifyTokenBuffer.length
-    ) {
+    if (tokenBuffer.length !== verifyTokenBuffer.length) {
       return res.status(403).send("Forbidden");
     }
 
-    if (
-      !crypto.timingSafeEqual(
-        tokenBuffer,
-        verifyTokenBuffer
-      )
-    ) {
+    if (!crypto.timingSafeEqual(tokenBuffer, verifyTokenBuffer)) {
       return res.status(403).send("Forbidden");
     }
 
-    console.log(
-      "WhatsApp webhook verified successfully"
-    );
+    console.log("WhatsApp webhook verified successfully");
 
     return res.status(200).send(challenge);
   } catch (error) {
-    console.error(
-      "WhatsApp webhook verification error:",
-      error
-    );
+    console.error("WhatsApp webhook verification error:", error);
 
     return res.status(403).send("Forbidden");
   }
@@ -311,7 +261,11 @@ const receiveWebhook = async (req, res) => {
 
     // Meta signs webhook bodies with the WhatsApp/Facebook app secret.
     // Never process an unsigned webhook in production.
-    if (!appSecret || typeof signature !== "string" || !signature.startsWith("sha256=")) {
+    if (
+      !appSecret ||
+      typeof signature !== "string" ||
+      !signature.startsWith("sha256=")
+    ) {
       return res.sendStatus(403);
     }
 
@@ -337,10 +291,7 @@ const receiveWebhook = async (req, res) => {
     // BASIC META WEBHOOK VALIDATION
     // ==========================================================
 
-    if (
-      body?.object !==
-      "whatsapp_business_account"
-    ) {
+    if (body?.object !== "whatsapp_business_account") {
       return res.sendStatus(200);
     }
 
@@ -360,39 +311,30 @@ const receiveWebhook = async (req, res) => {
         // PHONE NUMBER ID
         // ======================================================
 
-        const phoneNumberId =
-          value.metadata?.phone_number_id;
+        const phoneNumberId = value.metadata?.phone_number_id;
 
         if (!phoneNumberId) {
-          console.log(
-            "WhatsApp phone number ID not found"
-          );
-
+          console.log("WhatsApp phone number ID not found");
           continue;
         }
 
-        console.log(
-          "WhatsApp Phone Number ID:",
-          phoneNumberId
-        );
+        console.log("WhatsApp Phone Number ID:", phoneNumberId);
 
         // ======================================================
         // FIND GARAGE INTEGRATION
         // ======================================================
 
-        const integration =
-          await WhatsAppIntegration.findOne({
-            phoneNumberId,
-            isConnected: true,
-            isActive: true,
-          });
+        const integration = await WhatsAppIntegration.findOne({
+          phoneNumberId,
+          isConnected: true,
+          isActive: true,
+        });
 
         if (!integration) {
           console.log(
             "No connected garage found for Phone Number ID:",
             phoneNumberId
           );
-
           continue;
         }
 
@@ -400,17 +342,10 @@ const receiveWebhook = async (req, res) => {
         // FIND GARAGE
         // ======================================================
 
-        const garage =
-          await Garage.findById(
-            integration.garageId
-          );
+        const garage = await Garage.findById(integration.garageId);
 
         if (!garage) {
-          console.log(
-            "Garage not found:",
-            integration.garageId
-          );
-
+          console.log("Garage not found:", integration.garageId);
           continue;
         }
 
@@ -423,15 +358,11 @@ const receiveWebhook = async (req, res) => {
         // INCOMING MESSAGES
         // ======================================================
 
-        const messages =
-          value.messages || [];
+        const messages = value.messages || [];
 
         for (const message of messages) {
-          const senderPhone =
-            message.from;
-
-          const messageType =
-            message.type;
+          const senderPhone = message.from;
+          const messageType = message.type;
 
           let messageText = "";
 
@@ -440,25 +371,17 @@ const receiveWebhook = async (req, res) => {
           // ====================================================
 
           if (messageType === "text") {
-            messageText =
-              message.text?.body || "";
+            messageText = message.text?.body || "";
           }
-
-
 
           // ====================================================
           // NORMALIZE PHONE
           // ====================================================
 
-          const normalizedPhone =
-            String(senderPhone)
-              .replace(/\D/g, "");
+          const normalizedPhone = String(senderPhone).replace(/\D/g, "");
 
           if (!normalizedPhone) {
-            console.log(
-              "Invalid sender phone number"
-            );
-
+            console.log("Invalid sender phone number");
             continue;
           }
 
@@ -466,15 +389,11 @@ const receiveWebhook = async (req, res) => {
           // FIND OR CREATE CONVERSATION
           // ====================================================
 
-          const {
-            conversation,
-            customer,
-          } =
+          const { conversation, customer } =
             await findOrCreateConversation({
               garageId: garage._id,
               phoneNumberId,
-              customerPhone:
-                normalizedPhone,
+              customerPhone: normalizedPhone,
             });
 
           console.log(
@@ -484,9 +403,7 @@ const receiveWebhook = async (req, res) => {
 
           console.log(
             "Customer:",
-            customer
-              ? customer.name
-              : "Not registered"
+            customer ? customer.name : "Not registered"
           );
 
           // ====================================================
@@ -498,7 +415,6 @@ const receiveWebhook = async (req, res) => {
               "Unsupported WhatsApp message type:",
               messageType
             );
-
             continue;
           }
 
@@ -508,43 +424,33 @@ const receiveWebhook = async (req, res) => {
 
           await addConversationMessage({
             conversation,
-            messageId:
-              message.id || null,
+            messageId: message.id || null,
             direction: "incoming",
             type: messageType,
             text: messageText,
             aiGenerated: false,
           });
 
-          console.log(
-            "Incoming WhatsApp message saved"
-          );
+          console.log("Incoming WhatsApp message saved");
 
           // ====================================================
           // AI RESPONSE
           // ====================================================
 
           if (!integration.aiEnabled) {
-            console.log(
-              "AI is disabled for this garage"
-            );
-
+            console.log("AI is disabled for this garage");
             continue;
           }
 
           try {
-            const aiResponse =
-              await generateAIResponse({
-                integration,
-                customer,
-                conversation,
-                message: messageText,
-              });
+            const aiResponse = await generateAIResponse({
+              integration,
+              customer,
+              conversation,
+              message: messageText,
+            });
 
-            console.log(
-              "AI RESPONSE:",
-              aiResponse
-            );
+            console.log("AI RESPONSE:", aiResponse);
 
             // ==================================================
             // SEND AI RESPONSE TO WHATSAPP
@@ -556,10 +462,7 @@ const receiveWebhook = async (req, res) => {
               message: aiResponse,
             });
 
-            console.log(
-              "AI response sent successfully"
-            );
-
+            console.log("AI response sent successfully");
           } catch (error) {
             console.error(
               "AI WhatsApp processing error:",
@@ -575,12 +478,8 @@ const receiveWebhook = async (req, res) => {
     // ==========================================================
 
     return res.sendStatus(200);
-
   } catch (error) {
-    console.error(
-      "WhatsApp webhook error:",
-      error
-    );
+    console.error("WhatsApp webhook error:", error);
 
     // Always acknowledge Meta webhook
     return res.sendStatus(200);
@@ -588,7 +487,188 @@ const receiveWebhook = async (req, res) => {
 };
 
 // ============================================================
-// EXPORT
+// SEND WHATSAPP TEMPLATE MESSAGE (no PDF)
+// POST /api/whatsapp/send
+// ============================================================
+
+const sendTemplateMessage = async (req, res) => {
+  try {
+    const garageId = req.garageId || req.user?.garageId;
+
+    if (!garageId) {
+      return res.status(400).json({
+        success: false,
+        message: "Garage is not associated with this account",
+      });
+    }
+
+    const {
+      to,
+      templateName,
+      languageCode = "en",
+      type = "general",
+      bodyParameters = [],
+      customerId = null,
+      vehicleId = null,
+      reminderId = null,
+    } = req.body;
+
+    // ========================================================
+    // VALIDATION
+    // ========================================================
+
+    if (!to) {
+      return res.status(400).json({
+        success: false,
+        message: "Recipient phone number is required",
+      });
+    }
+
+    if (!templateName) {
+      return res.status(400).json({
+        success: false,
+        message: "Template name is required",
+      });
+    }
+
+    if (!Array.isArray(bodyParameters)) {
+      return res.status(400).json({
+        success: false,
+        message: "bodyParameters must be an array",
+      });
+    }
+
+    // ========================================================
+    // SEND
+    // ========================================================
+
+    const result = await sendWhatsAppTemplate({
+      garageId,
+      customerId,
+      vehicleId,
+      reminderId,
+      to,
+      templateName,
+      languageCode,
+      type,
+      bodyParameters,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "WhatsApp message sent successfully",
+      messageId: result.messageId || null,
+      logId: result.logId || null,
+    });
+  } catch (error) {
+    console.error("Send WhatsApp template error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Unable to send WhatsApp message",
+    });
+  }
+};
+
+// ============================================================
+// SEND WHATSAPP TEMPLATE + PDF ATTACHMENT
+// POST /api/whatsapp/send-with-pdf
+// ============================================================
+
+const sendTemplateMessageWithPdf = async (req, res) => {
+  try {
+    const garageId = req.garageId || req.user?.garageId;
+
+    if (!garageId) {
+      return res.status(400).json({
+        success: false,
+        message: "Garage is not associated with this account",
+      });
+    }
+
+    const {
+      to,
+      templateName,
+      languageCode = "en",
+      type = "general",
+      bodyParameters = [],
+      pdfUrl,
+      pdfFileName = "invoice.pdf",
+      customerId = null,
+      vehicleId = null,
+      reminderId = null,
+    } = req.body;
+
+    // ========================================================
+    // VALIDATION
+    // ========================================================
+
+    if (!to) {
+      return res.status(400).json({
+        success: false,
+        message: "Recipient phone number is required",
+      });
+    }
+
+    if (!templateName) {
+      return res.status(400).json({
+        success: false,
+        message: "Template name is required",
+      });
+    }
+
+    if (!pdfUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "PDF URL is required",
+      });
+    }
+
+    if (!Array.isArray(bodyParameters)) {
+      return res.status(400).json({
+        success: false,
+        message: "bodyParameters must be an array",
+      });
+    }
+
+    // ========================================================
+    // SEND
+    // ========================================================
+
+    const result = await sendWhatsAppTemplateWithPdf({
+      garageId,
+      customerId,
+      vehicleId,
+      reminderId,
+      to,
+      templateName,
+      languageCode,
+      type,
+      bodyParameters,
+      pdfUrl,
+      pdfFileName,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "WhatsApp message with PDF sent successfully",
+      messageId: result.messageId || null,
+      mediaId: result.mediaId || null,
+      logId: result.logId || null,
+    });
+  } catch (error) {
+    console.error("Send WhatsApp template + PDF error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message || "Unable to send WhatsApp message with PDF",
+    });
+  }
+};
+
+// ============================================================
+// EXPORTS
 // ============================================================
 
 module.exports = {
@@ -597,4 +677,6 @@ module.exports = {
   disconnectWhatsApp,
   verifyWebhook,
   receiveWebhook,
+  sendTemplateMessage,
+  sendTemplateMessageWithPdf,
 };

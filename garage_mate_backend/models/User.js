@@ -44,6 +44,34 @@ const userSchema = new mongoose.Schema(
       default: "garage_owner",
     },
 
+    // ============================================================
+    // STAFF ROLE (only when role === "staff")
+    // ============================================================
+
+    staffRole: {
+      type: String,
+      enum: [
+        "manager",
+        "mechanic",
+        "accountant",
+        null,
+      ],
+      default: null,
+    },
+
+    // Track which owner invited this staff
+    invitedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    // Track last activity for staff monitoring
+    lastActiveAt: {
+      type: Date,
+      default: null,
+    },
+
     garageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Garage",
@@ -112,6 +140,12 @@ userSchema.index(
     },
   }
 );
+
+// Index for staff queries
+userSchema.index({
+  garageId: 1,
+  role: 1,
+});
 
 module.exports = mongoose.model(
   "User",

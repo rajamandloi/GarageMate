@@ -32,7 +32,7 @@ const sendWhatsAppTemplate = async ({
   to,
 
   templateName,
-  language = "en_US",
+  language = "en",
 
   parameters = [],
 

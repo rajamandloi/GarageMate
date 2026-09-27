@@ -126,7 +126,7 @@ const processServiceReminders =
               "service_reminder",
 
             language:
-              "en_US",
+              "en",
 
             parameters: [
               customer.name,
@@ -236,7 +236,7 @@ const processPaymentReminders =
               "payment_reminder",
 
             language:
-              "en_US",
+              "en",
 
             parameters: [
               reminder.customerId.name,

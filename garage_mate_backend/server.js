@@ -16,6 +16,17 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const garageRoutes = require("./routes/garageRoutes");
 const whatsappRoutes = require("./routes/whatsappRoutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
+const automationRoutes = require("./routes/automationRoutes");
+const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
+const staffRoutes = require("./routes/staffRoutes");
+const {
+  startSubscriptionScheduler,
+} = require("./services/subscriptionScheduler");
+const {
+  startAutomationScheduler,
+} = require("./services/automationScheduler");
 
 const { startReminderScheduler } = require("./services/reminderScheduler");
 const {
@@ -142,6 +153,11 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/garage", garageRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/invoices", invoiceRoutes);
+app.use("/api/automation", automationRoutes);
+app.use("/api/subscription", subscriptionRoutes); 
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/staff", staffRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({
@@ -226,6 +242,8 @@ const startServer = async () => {
   app.listen(PORT, () => {
     console.log(`GarageMate server running on port ${PORT}`);
     startReminderScheduler();
+    startAutomationScheduler();
+    startSubscriptionScheduler();
   });
 };
 

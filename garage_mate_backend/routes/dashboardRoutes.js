@@ -2,6 +2,7 @@ const express = require("express");
 
 const {
   getDashboardStats,
+  getTodayTasks,
 } = require("../controllers/dashboardController");
 
 const protect = require("../middleware/authMiddleware");
@@ -10,15 +11,19 @@ const requireGarage = require("../middleware/garageMiddleware");
 const router = express.Router();
 
 // ============================================================
-// DASHBOARD STATS
-// GET /api/dashboard/stats
+// DASHBOARD ROUTES
+// Base URL: /api/dashboard
 // ============================================================
 
+// Main dashboard stats
+router.get("/", protect, requireGarage, getDashboardStats);
+
+// Today's tasks
 router.get(
-  "/stats",
+  "/today-tasks",
   protect,
   requireGarage,
-  getDashboardStats
+  getTodayTasks
 );
 
 module.exports = router;

@@ -13,6 +13,10 @@ class CustomerProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  // ============================================================
+  // FETCH ALL CUSTOMERS
+  // ============================================================
+
   Future<void> fetchCustomers() async {
     _isLoading = true;
     _error = null;
@@ -42,6 +46,10 @@ class CustomerProvider extends ChangeNotifier {
     }
   }
 
+  // ============================================================
+  // CREATE CUSTOMER ONLY
+  // ============================================================
+
   Future<bool> createCustomer(Customer customer) async {
     _error = null;
     notifyListeners();
@@ -66,8 +74,7 @@ class CustomerProvider extends ChangeNotifier {
         return true;
       }
 
-      _error =
-          response['message']?.toString() ??
+      _error = response['message']?.toString() ??
           'Unable to create customer';
 
       notifyListeners();
@@ -78,6 +85,101 @@ class CustomerProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  // ============================================================
+  // ✅ CREATE CUSTOMER + VEHICLE (LINKED)
+  // ============================================================
+
+  /// Returns the created [Customer] on success, or `null` on failure.
+  /// Sets [error] on failure.
+  Future<Customer?> createCustomerWithVehicle({
+    required Customer customer,
+    required String vehicleRegistrationNumber,
+    String vehicleBrand = '',
+    String vehicleModel = '',
+    String vehicleFuelType = 'Petrol',
+    String vehicleManufacturingYear = '',
+    double vehicleMileage = 0,
+  }) async {
+    _error = null;
+    notifyListeners();
+
+    try {
+      // --------------------------------------------------------
+      // STEP 1: Create Customer
+      // --------------------------------------------------------
+      final customerResponse = await ApiService.post(
+        '/customers',
+        customer.toJson(),
+      );
+
+      if (customerResponse['success'] != true ||
+          customerResponse['customer'] == null) {
+        _error = customerResponse['message']?.toString() ??
+            'Unable to create customer';
+        notifyListeners();
+        return null;
+      }
+
+      final createdCustomer = Customer.fromJson(
+        Map<String, dynamic>.from(
+          customerResponse['customer'],
+        ),
+      );
+
+      // --------------------------------------------------------
+      // STEP 2: Create Vehicle linked to customer
+      // --------------------------------------------------------
+      final vehicleBody = {
+        'customerId': createdCustomer.id,
+        'registrationNumber':
+            vehicleRegistrationNumber.trim().toUpperCase(),
+        'brand': vehicleBrand.trim(),
+        'model': vehicleModel.trim(),
+        'fuelType': vehicleFuelType,
+        'manufacturingYear': vehicleManufacturingYear.trim(),
+        'currentMileage': vehicleMileage,
+        'variant': '',
+        'vin': '',
+        'engineNumber': '',
+        'notes': '',
+      };
+
+      final vehicleResponse = await ApiService.post(
+        '/vehicles',
+        vehicleBody,
+      );
+
+      if (vehicleResponse['success'] != true) {
+        // Customer बन गया, लेकिन vehicle नहीं बना
+        // Error message में साफ बताएं
+        _error =
+            'Customer बना लेकिन Vehicle नहीं बना: ${vehicleResponse['message'] ?? 'Unknown error'}';
+
+        // Still insert customer into list
+        _customers.insert(0, createdCustomer);
+        notifyListeners();
+
+        return createdCustomer;
+      }
+
+      // --------------------------------------------------------
+      // SUCCESS — both created
+      // --------------------------------------------------------
+      _customers.insert(0, createdCustomer);
+      notifyListeners();
+
+      return createdCustomer;
+    } catch (error) {
+      _error = error.toString();
+      notifyListeners();
+      return null;
+    }
+  }
+
+  // ============================================================
+  // UPDATE CUSTOMER
+  // ============================================================
 
   Future<bool> updateCustomer(Customer customer) async {
     _error = null;
@@ -106,12 +208,10 @@ class CustomerProvider extends ChangeNotifier {
         }
 
         notifyListeners();
-
         return true;
       }
 
-      _error =
-          response['message']?.toString() ??
+      _error = response['message']?.toString() ??
           'Unable to update customer';
 
       notifyListeners();
@@ -122,6 +222,10 @@ class CustomerProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  // ============================================================
+  // DELETE CUSTOMER
+  // ============================================================
 
   Future<bool> deleteCustomer(String customerId) async {
     _error = null;
@@ -138,12 +242,10 @@ class CustomerProvider extends ChangeNotifier {
         );
 
         notifyListeners();
-
         return true;
       }
 
-      _error =
-          response['message']?.toString() ??
+      _error = response['message']?.toString() ??
           'Unable to delete customer';
 
       notifyListeners();
@@ -154,6 +256,10 @@ class CustomerProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
 
   void clearError() {
     _error = null;

@@ -61,9 +61,58 @@ const garageSchema = new mongoose.Schema(
       default: true,
     },
 
-     profileImage: {
+    profileImage: {
       type: String,
       default: "",
+    },
+
+    // ============================================================
+    // INVOICE BRANDING SETTINGS
+    // ============================================================
+
+    invoiceSettings: {
+      // Logo URL (uploaded separately)
+      logo: {
+        type: String,
+        default: "",
+      },
+
+      // Brand colors (hex)
+      primaryColor: {
+        type: String,
+        default: "#4A6CF7",
+        trim: true,
+      },
+
+      secondaryColor: {
+        type: String,
+        default: "#25D366",
+        trim: true,
+      },
+
+      // Custom footer message
+      footerMessage: {
+        type: String,
+        default:
+          "Thank you for choosing our garage!",
+        trim: true,
+        maxlength: 200,
+      },
+
+      // Terms & Conditions
+      termsAndConditions: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: 500,
+      },
+
+      // UPI ID for QR code
+      upiId: {
+        type: String,
+        default: "",
+        trim: true,
+      },
     },
   },
   {
@@ -71,4 +120,7 @@ const garageSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Garage", garageSchema);
+module.exports = mongoose.model(
+  "Garage",
+  garageSchema
+);

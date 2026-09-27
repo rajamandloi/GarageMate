@@ -7,6 +7,10 @@ import '../../../core/services/api_service.dart';
 import '../../dashboard/screens/dashboard_screen.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/user_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -132,6 +136,47 @@ class _LoginScreenState
         );
 
         if (!mounted) return;
+
+        // ✅ Save user data in provider
+if (data['user'] != null && data['user'] is Map) {
+  context.read<UserProvider>().setUser(
+    Map<String, dynamic>.from(data['user']),
+  );
+}
+
+// ==========================================================
+// SAVE FCM TOKEN
+// ==========================================================
+try {
+  // Request permission first (for iOS)
+  final settings = await FirebaseMessaging.instance.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
+  debugPrint('FCM permission: ${settings.authorizationStatus}');
+
+  // Get token
+  final fcmToken = await FirebaseMessaging.instance.getToken();
+
+  if (fcmToken != null && fcmToken.isNotEmpty) {
+    debugPrint('✅ FCM Token: ${fcmToken.substring(0, 20)}...');
+
+    // Save to backend
+    final response = await ApiService.post(
+      '/auth/fcm-token',
+      {'fcmToken': fcmToken},
+    );
+
+    debugPrint('FCM save response: $response');
+  } else {
+    debugPrint('⚠️ FCM token is null');
+  }
+} catch (e) {
+  debugPrint('❌ FCM token error: $e');
+  // Don't block login if FCM fails
+}
 
         // ------------------------------------------------------
         // GO TO DASHBOARD
